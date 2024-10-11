@@ -3,14 +3,15 @@ from dataclasses import dataclass
 from functools import reduce
 import itertools
 import operator
-from typing import Any, Dict, Iterable, Optional, Self, TypeAlias
+from typing import Any, Dict, Iterable, Optional, Self, Type, TypeAlias
 from networkx.classes.multidigraph import MultiDiGraph
 import numpy as np
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton
 from pyformlang.finite_automaton.state import State
 from pyformlang.finite_automaton.symbol import Symbol
 from scipy.sparse._csr import csr_matrix
-from scipy.sparse import kron
+from scipy.sparse import kron, spmatrix
+
 
 from project.task2 import graph_to_nfa, regex_to_dfa
 
@@ -21,7 +22,8 @@ Transition: TypeAlias = Any
 class AdjacencyMatrixFA:
     start_states: set
     final_states: set
-    adjacency_matrixes_boolean_decomposition: dict[Transition, csr_matrix]
+    matrix_type: Type[spmatrix]
+    adjacency_matrixes_boolean_decomposition: dict[Transition, spmatrix]
     index_of_states: dict[State, int]
 
     @property
@@ -36,9 +38,14 @@ class AdjacencyMatrixFA:
     def state_of_indexes(self):
         return {idx: state for state, idx in self.index_of_states.items()}
 
-    def __init__(self, automaton: Optional[NondeterministicFiniteAutomaton]):
+    def __init__(
+        self,
+        automaton: Optional[NondeterministicFiniteAutomaton],
+        matrix_type: Type[spmatrix] = csr_matrix,
+    ):
         if automaton is None:
             return
+        self.matrix_type = matrix_type
         graph = automaton.to_networkx()
         self.index_of_states = {state: idx for idx, state in enumerate(graph.nodes)}
         self.start_states = set()
@@ -62,7 +69,7 @@ class AdjacencyMatrixFA:
                     self.index_of_states[destination_state],
                 ] = True
         self.adjacency_matrixes_boolean_decomposition = {
-            transition: csr_matrix(adjacency_matrix)
+            transition: matrix_type(adjacency_matrix)
             for transition, adjacency_matrix in adjacency_matrixes_boolean_decomposition.items()
         }
 
@@ -97,21 +104,21 @@ class AdjacencyMatrixFA:
                 queue.append(ToCheck(symbols=iter(symbols), state=state))
         return False
 
-    def transitive_closure(self) -> csr_matrix:
+    def transitive_closure(self):
         adjacency_matrixes = list(
             self.adjacency_matrixes_boolean_decomposition.values()
         )
         if adjacency_matrixes:
             if len(adjacency_matrixes) > 1:
-                transitions: csr_matrix = reduce(
+                transitions = reduce(
                     operator.add, adjacency_matrixes[1:], adjacency_matrixes[0]
                 )
             else:
-                transitions: csr_matrix = adjacency_matrixes[0]
+                transitions = adjacency_matrixes[0]
         else:
-            return csr_matrix(np.eye(self.state_count, dtype=np.bool_))
+            return self.matrix_type(np.eye(self.state_count, dtype=np.bool_))
         transitions.setdiag(True)
-        res: csr_matrix = transitions.copy()
+        res = transitions.copy()
         for _ in range(2, self.state_count + 1):
             new_res = res * transitions
             if np.array_equal(res.todense(), new_res.todense()):
@@ -129,8 +136,14 @@ class AdjacencyMatrixFA:
         return True
 
     @classmethod
-    def intersect_automata(cls, automaton1: Self, automaton2: Self) -> Self:
+    def intersect_automata(
+        cls,
+        automaton1: Self,
+        automaton2: Self,
+        matrix_type: Type[spmatrix] = csr_matrix,
+    ) -> Self:
         inst = cls(None)
+        inst.matrix_type = matrix_type
         state_count = automaton1.state_count * automaton2.state_count
 
         def get_new_state_index(state1, state2):
@@ -192,10 +205,13 @@ def tensor_based_rpq(
     graph: MultiDiGraph,
     start_nodes: set[int],
     final_nodes: set[int],
+    matrix_type: Type[spmatrix] = csr_matrix,
 ) -> set[tuple[int, int]]:
-    adj_from_regex = AdjacencyMatrixFA(regex_to_dfa(regex))
-    adj_from_graph = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
-    intersected = intersect_automata(adj_from_graph, adj_from_regex)
+    adj_from_regex = AdjacencyMatrixFA(regex_to_dfa(regex), matrix_type)
+    adj_from_graph = AdjacencyMatrixFA(
+        graph_to_nfa(graph, start_nodes, final_nodes), matrix_type
+    )
+    intersected = intersect_automata(adj_from_graph, adj_from_regex, matrix_type)
 
     trans_closure = intersected.transitive_closure()
     res = set()
