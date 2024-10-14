@@ -195,9 +195,11 @@ class AdjacencyMatrixFA:
 
 
 def intersect_automata(
-    automaton1: AdjacencyMatrixFA, automaton2: AdjacencyMatrixFA
+    automaton1: AdjacencyMatrixFA,
+    automaton2: AdjacencyMatrixFA,
+    matrix_type: Type[spmatrix] = csr_matrix,
 ) -> AdjacencyMatrixFA:
-    return AdjacencyMatrixFA.intersect_automata(automaton1, automaton2)
+    return AdjacencyMatrixFA.intersect_automata(automaton1, automaton2, matrix_type)
 
 
 def tensor_based_rpq(
