@@ -1,5 +1,7 @@
+from typing import Type
 import scipy.sparse as sp
 from scipy.sparse._csr import csr_matrix
+from scipy.sparse import spmatrix
 from networkx import MultiDiGraph
 from functools import reduce
 from collections import defaultdict
@@ -9,9 +11,7 @@ from project.task2 import regex_to_dfa, graph_to_nfa
 from project.task3 import AdjacencyMatrixFA
 
 
-def get_init_front(
-    adj_regex: AdjacencyMatrixFA, adj_graph: AdjacencyMatrixFA
-) -> sp.csr_matrix:
+def get_init_front(adj_regex: AdjacencyMatrixFA, adj_graph: AdjacencyMatrixFA):
     matrixes = []
     for start_state_graph in adj_graph.start_states:
         matrix = sp.lil_matrix((adj_regex.state_count, adj_graph.state_count))
@@ -22,14 +22,20 @@ def get_init_front(
             ] = 1
         matrixes.append(matrix)
 
-    return sp.vstack(matrixes, format="csr")
+    return adj_graph.matrix_type(sp.vstack(matrixes))
 
 
 def ms_bfs_based_rpq(
-    regex: str, graph: MultiDiGraph, start_nodes: set[int], final_nodes: set[int]
+    regex: str,
+    graph: MultiDiGraph,
+    start_nodes: set[int],
+    final_nodes: set[int],
+    matrix_type: Type[spmatrix] = csr_matrix,
 ) -> set[tuple[int, int]]:
-    adj_regex = AdjacencyMatrixFA(regex_to_dfa(regex))
-    adj_graph = AdjacencyMatrixFA(graph_to_nfa(graph, start_nodes, final_nodes))
+    adj_regex = AdjacencyMatrixFA(regex_to_dfa(regex), matrix_type)
+    adj_graph = AdjacencyMatrixFA(
+        graph_to_nfa(graph, start_nodes, final_nodes), matrix_type
+    )
 
     regex_state_count = adj_regex.state_count
 
@@ -45,7 +51,7 @@ def ms_bfs_based_rpq(
 
     while front.count_nonzero() > 0:
         visited += front
-        fronts = defaultdict(lambda: csr_matrix(front.shape, dtype=bool))
+        fronts = defaultdict(lambda: matrix_type(front.shape, dtype=bool))
         for transition in transitions:
             new_front = (
                 front * adj_graph.adjacency_matrixes_boolean_decomposition[transition]
@@ -61,7 +67,7 @@ def ms_bfs_based_rpq(
                     ]
 
         front = reduce(
-            lambda x, y: x + y, fronts.values(), csr_matrix(front.shape, dtype=bool)
+            lambda x, y: x + y, fronts.values(), matrix_type(front.shape, dtype=bool)
         )
         front = front > visited
 
