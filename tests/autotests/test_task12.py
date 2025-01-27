@@ -16,11 +16,8 @@ from to_program_parser import (
     to_program_parser,
 )
 
-try:
-    from project.task7 import matrix_based_cfpq
-    from project.task12.main import exec_program, typing_program
-except ImportError:
-    pytestmark = pytest.mark.skip("Task 12 is not ready to test!")
+from project.task7 import matrix_based_cfpq
+from project.task12.main import exec_program, typing_program
 
 
 class TestTypeInference:
