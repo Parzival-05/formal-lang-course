@@ -27,7 +27,7 @@ jobs:
       - name: Use ANTLR
         run: |
           source .venv/bin/activate
-          antlr4 -Dlanguage=Python3 project/task11/parser/Graph.g4
+          antlr4 -Dlanguage=Python3 project/task11/parser/Graph.g4 -visitor
 
       - name: Run tests
         run: python scripts/run_tests.py
