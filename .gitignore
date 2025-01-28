@@ -154,4 +154,4 @@ _minted-presentation/
 GraphParser.py
 GraphListener.py
 GraphLexer.py
-GraphLexer.py
+GraphVisitor.py
